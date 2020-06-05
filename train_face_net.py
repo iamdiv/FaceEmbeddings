@@ -7,10 +7,11 @@ import cv2
 from keras.datasets import mnist
 
 ## for Model definition/training
+
 from keras.models import Model, load_model
 from keras.layers import Input, Flatten, Dense, concatenate,  Dropout,Conv2D,MaxPooling2D
 from keras.optimizers import Adam
-
+from keras.regularizers import l2
 from keras.utils import plot_model
 from keras.callbacks import ModelCheckpoint
 
@@ -24,15 +25,18 @@ import tensorflow as tf
 import matplotlib.pyplot as plt, numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import LabelEncoder
+tf.reset_default_graph()
+# create plugin for device
 
 def create_base_network(input_shape,embedding_size):
     input_image = Input(shape=input_shape)
-    input_layer = Conv2D(filters = 64,kernel_size = 2,  padding = "same",activation = "relu")(input_image)
-    x = MaxPooling2D(pool_size = (1,1))(input_layer)
-    x = Dropout(0.3)(x)
-    x = Conv2D(filters = 32,kernel_size = 2, padding = "same",activation = "relu")(x)
+    
+    x = Conv2D(128,(7,7),activation = "relu",kernel_initializer = 'he_uniform',kernel_regularizer = l2(2e-4))(input_image)
+    x = MaxPooling2D(pool_size = (1,1))(x)
+    
+    x = Conv2D(128,(3,3),activation = "relu",kernel_initializer = 'he_uniform',kernel_regularizer = l2(2e-4))(x)
     x = MaxPooling2D(pool_size = 1)(x)
-    x = Dropout(0.3)(x)
+    x = Conv2D(256,(3,3),activation = "relu",kernel_initializer = 'he_uniform',kernel_regularizer = l2(2e-4))(x)
     x = Flatten()(x)
     x  =Dense(128,activation = "relu")(x)
     x = Dropout(0.1)(x)
@@ -203,39 +207,22 @@ def masked_minimum(data, mask, dim=1):
 def _normalize_img(img, label):
     img = tf.cast(img, tf.float32) / 255.
     return (img, label)
-img_path = "D:/facenet/image"
-
-all_imag = os.listdir(img_path)
-
-img_arr = []
-label = []
-for i in all_imag:
-
-    print("*************************************",img_path +"/"+i)
-    img_p = os.listdir(img_path +"/"+i)
-    print(img_p)
-    for p in img_p:
-        path = img_path + "/" + i +"/"+ p
-        print(path)
-        img_arr.append(cv2.resize(cv2.imread(path,cv2.IMREAD_COLOR),(250,250),interpolation=cv2.INTER_CUBIC))
-        #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        label.append(i)
+(x_train,y_train),(x_test,y_test) = mnist.load_data()
+x_train = x_train.astype('float32')
+x_test = x_test.astype('float32')
+x_train /= 255
+x_test /= 255
+x_train = np.reshape(x_train,(len(x_train),28,28,1))
+x_test = np.reshape(x_test,(len(x_test),28,28,1))
 
 #df = pd.DataFrame(all_image,columns = ["img","label"])
-batch_size = 256
-epochs = 150
+batch_size = 100
+epochs = 50
 no_of_component = 2
 embedding_size = 64
-x_train = img_arr
-x_train = np.array(x_train)
-print(x_train.shape)
-label = pd.DataFrame(label)
-le = LabelEncoder()
-label = le.fit_transform(label)
-y_train = label
+
 print("checked")
-input_image_shape = (250,250,3)
+input_image_shape = (28,28,1)
 base_network = create_base_network(input_image_shape,embedding_size)
 input_images = Input(shape = input_image_shape,name = "input_image")
 input_labels = Input(shape = (1,),name = "input_labels")
